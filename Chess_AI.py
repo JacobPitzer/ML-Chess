@@ -31,8 +31,9 @@ def nbr(board, move, parent, visited_branch, ai_move):
     new_chessboard = copy.deepcopy(board)
     visited_branch.add(parent)
     new_chessboard.push(move)
+    if parent.move_made is not None:
+        move = parent.move_made
     new_chess_node = ChessNode(new_chessboard, parent, move, visited_branch)
-    heuristic(new_chess_node, ai_move)
     return new_chess_node
 
 
@@ -41,37 +42,36 @@ def possible_moves(chess_node, ai_move):
     for moves in list(chess_node.chessBoard.legal_moves):
         neighbors.append(nbr(chess_node.chessBoard, moves, chess_node,
                              chess_node.visitedBranchSet, ai_move))
-    chess_node.set_children(neighbors)
     return neighbors
 
 
-def determine_value(captured_piece, ai_move):
-    if ai_move == 1:
-        if str(captured_piece) == 'p':
+def determine_value(index_piece, ai_move):
+    if ai_move == -1:
+        if str(index_piece) == 'p':
             return PAWN_VALUE
-        if str(captured_piece) == 'n':
+        if str(index_piece) == 'n':
             return KNIGHT_VALUE
-        if str(captured_piece) == 'b':
+        if str(index_piece) == 'b':
             return BISHOP_VALUE
-        if str(captured_piece) == 'r':
+        if str(index_piece) == 'r':
             return ROOK_VALUE
-        if str(captured_piece) == 'q':
+        if str(index_piece) == 'q':
             return QUEEN_VALUE
-        if str(captured_piece) == 'k':
+        if str(index_piece) == 'k':
             return KING_VALUE
         return 0
     else:
-        if str(captured_piece) == 'P':
+        if str(index_piece) == 'P':
             return PAWN_VALUE
-        if str(captured_piece) == 'N':
+        if str(index_piece) == 'N':
             return KNIGHT_VALUE
-        if str(captured_piece) == 'B':
+        if str(index_piece) == 'B':
             return BISHOP_VALUE
-        if str(captured_piece) == 'R':
+        if str(index_piece) == 'R':
             return ROOK_VALUE
-        if str(captured_piece) == 'Q':
+        if str(index_piece) == 'Q':
             return QUEEN_VALUE
-        if str(captured_piece) == 'K':
+        if str(index_piece) == 'K':
             return KING_VALUE
         return 0
 
@@ -83,31 +83,47 @@ def heuristic(state, ai_move):
     return state
 
 
+def best_max_state(state, move, ai_move):
+    heuristic(move, ai_move)
+    if state.heuristic > move.heuristic:
+        return state
+    return move
+
+
 def max_value(state, max_depth, depth, alpha, beta, ai_move):
     if state.chessBoard.is_game_over():
-        return -900
+        state.heuristic = -9000
+        return state
     elif max_depth == depth:
         return heuristic(state, ai_move)
     else:
         state.heuristic = -math.inf
         for move in possible_moves(state, ai_move):
-            state.heuristic = max(state.heuristic, min_value(move, max_depth, depth + 1, alpha, beta, ai_move).heuristic)
+            state = best_max_state(state, min_value(move, max_depth, depth + 1, alpha, beta, ai_move), ai_move)
             if state.heuristic >= beta:
                 return state
             alpha = max(alpha, state.heuristic)
     return state
 
 
+def best_min_move(state, move, ai_move):
+    heuristic(move, -ai_move)
+    if state.heuristic < move.heuristic:
+        return state
+    return move
+
+
 # min's move
 def min_value(state, max_depth, depth, alpha, beta, ai_move):
     if state.chessBoard.is_game_over():
-        return 900
+        state.heuristic = 9000
+        return state
     elif max_depth == depth:
         return heuristic(state, -ai_move)
     else:
         state.heuristic = math.inf
         for move in possible_moves(state, ai_move):
-            state.heuristic = min(state.heuristic, max_value(move, max_depth, depth + 1, alpha, beta, ai_move).heuristic)
+            state = best_min_move(state, max_value(move, max_depth, depth + 1, alpha, beta, ai_move), ai_move)
             if state.heuristic <= alpha:
                 return state
             beta = min(beta, state.heuristic)
@@ -116,13 +132,7 @@ def min_value(state, max_depth, depth, alpha, beta, ai_move):
 
 #  main starting point for the heuristic_minimax algorithm
 def heuristic_minimax(chess_state, max_depth, depth, ai_move):
-    best_value = -math.inf
-    best_move = None
-    for child in max_value(chess_state, max_depth, depth, -math.inf, math.inf, ai_move).childNodes:
-        if child.heuristic > best_value:
-            best_move = child
-            best_value = child.heuristic
-    return best_move
+    return max_value(chess_state, max_depth, depth, -math.inf, math.inf, ai_move)
 
 
 def player_move(chessboard):
@@ -139,16 +149,17 @@ def player_move(chessboard):
     print(chessboard)
 
 
-def start_game(chessboard, minmax_depth, starting_depth, starting_player):
+def start_game(chessboard, minimax_depth, starting_depth, starting_player):
     if starting_player == 1:
         while not chessboard.chessBoard.is_game_over():
-            chessboard.chessBoard.push(heuristic_minimax(chessboard, minmax_depth, starting_depth, 1))
+            state_picked = heuristic_minimax(chessboard, minimax_depth, starting_depth, 1)
+            chessboard.chessBoard.push(state_picked.move_made)
             player_move(chessboard.chessBoard)
     elif starting_player == -1:
         while not chessboard.chessBoard.is_game_over():
             player_move(chessboard.chessBoard)
-            this_sent_back = heuristic_minimax(chessboard, minmax_depth, starting_depth, -1).move_made
-            chessboard.chessBoard.push(this_sent_back)
+            state_picked = heuristic_minimax(chessboard, minimax_depth, starting_depth, -1)
+            chessboard.chessBoard.push(state_picked.move_made)
 
 
 def main(args):
@@ -163,11 +174,11 @@ def main(args):
     chessboard = chess.Board()
     start_state = ChessNode(chessboard, None, None, set())
 
-    minmax_depth = 3
-    starting_player = -1
-    starting_depth = 0
+    minimax_depth = 5
+    starting_player = 1
+    starting_depth = 1
 
-    start_game(start_state, minmax_depth, starting_depth, starting_player)
+    start_game(start_state, minimax_depth, starting_depth, starting_player)
 
     return 0
 
