@@ -1,2 +1,2 @@
 # ML-Chess
-A repository for chess machine learning game for Artistical Intelligence 
+A repository for chess machine learning game for Artificial Intelligence
